@@ -4,6 +4,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>DiktatTool</RootNamespace>
     <AssemblyName>Diktat-Tool</AssemblyName>
     <PublishSingleFile>true</PublishSingleFile>
