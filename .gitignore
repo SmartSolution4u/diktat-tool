@@ -1,0 +1,6 @@
+bin/
+obj/
+dist/
+config.json
+*.user
+.vs/
