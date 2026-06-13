@@ -1,5 +1,6 @@
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 
 namespace DiktatTool;
 
@@ -46,7 +47,37 @@ public class AudioRecorder : IDisposable
         _capture?.Dispose();
         _capture = null;
 
-        return _tempPath;
+        // Auf 16 kHz Mono reduzieren (das Format, das Whisper nutzt). Die native
+        // Aufnahme ist oft 48 kHz/Stereo/32-bit -> mehrere MB; nach dem Downsampling
+        // nur ein Bruchteil davon -> deutlich schnellerer Upload zu Groq.
+        return Downsample(_tempPath);
+    }
+
+    private static string? Downsample(string? srcPath)
+    {
+        if (srcPath == null || !File.Exists(srcPath)) return srcPath;
+        try
+        {
+            var dstPath = System.IO.Path.ChangeExtension(srcPath, null) + "_16k.wav";
+            using (var reader = new AudioFileReader(srcPath))
+            {
+                ISampleProvider source = reader;
+                if (reader.WaveFormat.Channels > 1)
+                    source = new StereoToMonoSampleProvider(reader)
+                        { LeftVolume = 0.5f, RightVolume = 0.5f };
+
+                var resampled = new WdlResamplingSampleProvider(source, 16000);
+                WaveFileWriter.CreateWaveFile16(dstPath, resampled);
+            }
+
+            try { File.Delete(srcPath); } catch { }
+            return dstPath;
+        }
+        catch
+        {
+            // Im Fehlerfall die Originaldatei verwenden — lieber langsam als gar nicht.
+            return srcPath;
+        }
     }
 
     public void Dispose()

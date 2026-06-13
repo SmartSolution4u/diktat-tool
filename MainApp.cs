@@ -28,7 +28,7 @@ public class MainApp : ApplicationContext
     public MainApp(Config config)
     {
         _config     = config;
-        _groq       = new GroqClient(config.GroqApiKey);
+        _groq       = new GroqClient(config.GroqApiKey, config.SttModel);
         _openRouter = string.IsNullOrEmpty(config.OpenRouterKey)
             ? null
             : new OpenRouterClient(config.OpenRouterKey);
@@ -165,6 +165,7 @@ public class MainApp : ApplicationContext
 
     private void StopAndProcess()
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         var path = _recorder?.Stop();
         _recorder?.Dispose();
         _recorder = null;
@@ -200,7 +201,9 @@ public class MainApp : ApplicationContext
                     Paste();
                 }
 
-                ShowBalloon("Text eingefügt", text[..Math.Min(80, text.Length)] + (text.Length > 80 ? "..." : ""), 2000);
+                sw.Stop();
+                ShowBalloon($"Text eingefügt ({sw.Elapsed.TotalSeconds:F1}s)",
+                    text[..Math.Min(80, text.Length)] + (text.Length > 80 ? "..." : ""), 2000);
                 Beep(1000, 80);
                 await Task.Delay(60);
                 Beep(1200, 80);

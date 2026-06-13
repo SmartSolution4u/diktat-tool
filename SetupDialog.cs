@@ -15,6 +15,7 @@ public class SetupDialog : Form
     private TextBox   _groqKey   = null!;
     private TextBox   _orKey     = null!;
     private ComboBox  _model     = null!;
+    private ComboBox  _sttModel  = null!;
     private ComboBox  _hotkey    = null!;
 
     private ListBox   _modeList   = null!;
@@ -92,6 +93,15 @@ public class SetupDialog : Form
                 if ((_model.Items[i]?.ToString() ?? "").TrimStart().StartsWith(cfg.Model))
                 {
                     _model.SelectedIndex = i;
+                    break;
+                }
+            }
+
+            for (int i = 0; i < _sttModel.Items.Count; i++)
+            {
+                if ((_sttModel.Items[i]?.ToString() ?? "").TrimStart().StartsWith(cfg.SttModel))
+                {
+                    _sttModel.SelectedIndex = i;
                     break;
                 }
             }
@@ -194,6 +204,28 @@ public class SetupDialog : Form
             Padding   = new Padding(8)
         };
         page.Controls.Add(cost);
+        y += 110;
+
+        Separator(page, y); y += 20;
+
+        H1(page, "Spracherkennung (Whisper bei Groq)", ref y);
+        Hint(page, "Turbo = schnell & günstig (empfohlen). Large = minimal genauer, aber langsamer.", ref y);
+        _sttModel = new ComboBox
+        {
+            Location      = new Point(20, y),
+            Width         = 460,
+            BackColor     = INPUT,
+            ForeColor     = FG,
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            FlatStyle     = FlatStyle.Flat
+        };
+        _sttModel.Items.AddRange(new[]
+        {
+            "whisper-large-v3-turbo   (schnell, günstig — empfohlen)",
+            "whisper-large-v3         (minimal genauer, langsamer)",
+        });
+        _sttModel.SelectedIndex = 0;
+        page.Controls.Add(_sttModel);
 
         return page;
     }
@@ -483,6 +515,12 @@ public class SetupDialog : Form
         return s.Split(' ')[0].Trim();
     }
 
+    private string SttModelId()
+    {
+        var s = _sttModel.SelectedItem?.ToString() ?? "";
+        return s.Split(' ')[0].Trim();
+    }
+
     private void OnSave(object? sender, EventArgs e)
     {
         var groq = _groqKey.Text.Trim();
@@ -501,6 +539,7 @@ public class SetupDialog : Form
         cfg.GroqApiKey    = groq;
         cfg.OpenRouterKey = _orKey.Text.Trim();
         cfg.Model         = ModelId();
+        cfg.SttModel      = SttModelId();
         cfg.Hotkey        = _hotkey.SelectedItem?.ToString() ?? "F9";
         if (cleaned.Count > 0)
         {

@@ -7,8 +7,13 @@ public class GroqClient
 {
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(30) };
     private readonly string _apiKey;
+    private readonly string _model;
 
-    public GroqClient(string apiKey) => _apiKey = apiKey;
+    public GroqClient(string apiKey, string? model = null)
+    {
+        _apiKey = apiKey;
+        _model  = string.IsNullOrWhiteSpace(model) ? "whisper-large-v3-turbo" : model;
+    }
 
     public async Task<string> TranscribeAsync(string wavPath)
     {
@@ -18,7 +23,7 @@ public class GroqClient
         var file = new ByteArrayContent(bytes);
         file.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
         form.Add(file, "file", "audio.wav");
-        form.Add(new StringContent("whisper-large-v3"), "model");
+        form.Add(new StringContent(_model), "model");
         form.Add(new StringContent("de"), "language");
 
         var req = new HttpRequestMessage(HttpMethod.Post,

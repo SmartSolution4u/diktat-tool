@@ -31,6 +31,9 @@ public class Config
     [JsonPropertyName("MODEL")]
     public string Model { get; set; } = "anthropic/claude-haiku-4.5";
 
+    [JsonPropertyName("STT_MODEL")]
+    public string SttModel { get; set; } = "whisper-large-v3-turbo";
+
     [JsonPropertyName("HOTKEY")]
     public string Hotkey { get; set; } = "F9";
 
