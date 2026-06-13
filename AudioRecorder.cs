@@ -51,8 +51,10 @@ public class AudioRecorder : IDisposable
 
     public void Dispose()
     {
+        // Gibt nur die Aufnahme-Ressourcen frei. Die temporaere WAV-Datei wird
+        // bewusst NICHT hier geloescht — sie wird nach der Transkription vom
+        // Aufrufer entfernt (MainApp finally). Sonst Use-after-delete:
+        // die Datei waere weg, bevor sie transkribiert werden kann.
         Stop();
-        if (_tempPath != null && File.Exists(_tempPath))
-            try { File.Delete(_tempPath); } catch { }
     }
 }
