@@ -96,6 +96,20 @@ public class MainApp : ApplicationContext
 
         menu.Items.Add(new ToolStripSeparator());
 
+        // Einstellungen (Keys / Modell / Hotkey aendern)
+        var settings = new ToolStripMenuItem("Einstellungen…");
+        settings.BackColor = Color.FromArgb(30, 30, 46);
+        settings.ForeColor = Color.FromArgb(205, 214, 244);
+        settings.Click += (s, e) =>
+        {
+            using var dlg = new SetupDialog();
+            if (dlg.ShowDialog() == DialogResult.OK)
+                Application.Restart();   // neue Config/Keys sauber uebernehmen
+        };
+        menu.Items.Add(settings);
+
+        menu.Items.Add(new ToolStripSeparator());
+
         // Beenden
         var quit = new ToolStripMenuItem("Beenden");
         quit.BackColor = Color.FromArgb(30, 30, 46);

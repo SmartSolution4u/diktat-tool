@@ -66,6 +66,33 @@ public class SetupDialog : Form
         btn.Click += OnSave;
         btnPanel.Controls.Add(btn);
         Controls.Add(btnPanel);
+
+        PrefillFromConfig();
+    }
+
+    /// <summary>Befuellt die Felder mit den aktuell gespeicherten Werten
+    /// (Keys aus dem Credential Manager), damit der Dialog auch zum Aendern taugt.</summary>
+    private void PrefillFromConfig()
+    {
+        try
+        {
+            var cfg = Config.Load();
+            _groqKey.Text = cfg.GroqApiKey;
+            _orKey.Text   = cfg.OpenRouterKey;
+
+            for (int i = 0; i < _model.Items.Count; i++)
+            {
+                if ((_model.Items[i]?.ToString() ?? "").TrimStart().StartsWith(cfg.Model))
+                {
+                    _model.SelectedIndex = i;
+                    break;
+                }
+            }
+
+            if (_hotkey.Items.Contains(cfg.Hotkey))
+                _hotkey.SelectedItem = cfg.Hotkey;
+        }
+        catch { }
     }
 
     private static void DrawTab(object? sender, DrawItemEventArgs e)
@@ -125,13 +152,12 @@ public class SetupDialog : Form
         };
         _model.Items.AddRange(new[]
         {
-            "mistralai/mistral-small-3.1-24b-instruct  (schnell, günstig)",
-            "mistralai/mistral-large-latest             (hohe Qualität)",
+            "anthropic/claude-haiku-4.5                 (Claude, schnell — empfohlen)",
+            "anthropic/claude-sonnet-4.5                (Claude, beste Qualität)",
+            "mistralai/mistral-small-3.1-24b-instruct   (günstig)",
             "openai/gpt-4o-mini                         (OpenAI, günstig)",
-            "openai/gpt-4o                              (OpenAI, beste Qualität)",
-            "anthropic/claude-haiku-4-5-20251001        (Claude, sehr schnell)",
-            "anthropic/claude-sonnet-4-5                (Claude, sehr gut)",
-            "meta-llama/llama-3.3-70b-instruct          (Open Source, kostenlos)",
+            "openai/gpt-4o                              (OpenAI, hohe Qualität)",
+            "meta-llama/llama-3.3-70b-instruct          (Open Source)",
         });
         _model.SelectedIndex = 0;
         page.Controls.Add(_model);
@@ -142,10 +168,11 @@ public class SetupDialog : Form
         H1(page, "Kosten-Übersicht (ca.)", ref y);
         var cost = new Label
         {
-            Text = "Mistral Small:   ~0,10 € / 1 Mio. Tokens  ≈ 0,0001 € pro Diktat\n" +
-                   "GPT-4o mini:     ~0,15 € / 1 Mio. Tokens  ≈ 0,0001 € pro Diktat\n" +
-                   "Claude Haiku:    ~0,25 € / 1 Mio. Tokens  ≈ 0,0002 € pro Diktat\n\n" +
-                   "Bei 50 Diktaten/Tag mit Umformulierung: ~0,15 €/Monat",
+            Text = "Claude Haiku:    ~1 $ Input / 5 $ Output je 1 Mio. Tokens\n" +
+                   "                 ≈ deutlich unter 0,01 € pro Diktat\n" +
+                   "Mistral Small:   ~0,10 € / 1 Mio. Tokens  (günstigste Option)\n" +
+                   "GPT-4o mini:     ~0,15 € / 1 Mio. Tokens\n\n" +
+                   "Bei 50 Diktaten/Tag mit Umformulierung: wenige Cent/Monat",
             Location  = new Point(20, y),
             Size      = new Size(460, 100),
             BackColor = Color.FromArgb(24, 24, 37),
