@@ -227,10 +227,10 @@ public class SetupDialog : Form
         {
             Text      = "Den aktiven Modus wählst du jederzeit über das Tray-Icon\n" +
                         "(Rechtsklick auf das Symbol unten rechts).\n\n" +
-                        "Die Modi und ihre Prompts kannst du im Tab „Modi" anpassen –\n" +
+                        "Die Modi und ihre Prompts kannst du im Tab 'Modi' anpassen -\n" +
                         "eigene Modi anlegen, umbenennen oder löschen.\n\n" +
                         "Tipp: Ein Modus mit leerem Prompt fügt den Text direkt ein\n" +
-                        "(keine KI), genau wie der Modus „Roh".",
+                        "(keine KI), genau wie der Modus 'Roh'.",
             Location  = new Point(20, y),
             Size      = new Size(460, 160),
             ForeColor = MUTED,
