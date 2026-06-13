@@ -1,93 +1,68 @@
-using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace DiktatTool;
 
 /// <summary>
-/// Speichert Geheimnisse (API-Keys) sicher im Windows Credential Manager
-/// (Anmeldeinformationsverwaltung) statt im Klartext in der config.json.
-/// Pendant zur keyring-Loesung der Python-Variante.
+/// Speichert Geheimnisse (API-Keys) mit Windows-DPAPI verschluesselt in
+/// kleinen Dateien neben der config.json. Die Verschluesselung ist an den
+/// Windows-Benutzer gebunden (kein Klartext, nicht auf andere PCs uebertragbar)
+/// und funktioniert OHNE den Credential-Manager-Dienst (VaultSvc).
 /// </summary>
 public static class SecretStore
 {
-    private const string Prefix = "DiktatTool:";
+    // Zusaetzliche Entropie — koppelt die Verschluesselung an diese Anwendung.
+    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("DiktatTool-secrets-v1");
 
-    /// <summary>Liest ein Geheimnis; gibt null zurueck, wenn nicht vorhanden.</summary>
+    private static string DirPath =>
+        System.IO.Path.GetDirectoryName(Config.FilePath) ?? AppContext.BaseDirectory;
+
+    private static string PathFor(string name) =>
+        System.IO.Path.Combine(DirPath, $"secret_{name}.dat");
+
+    /// <summary>Liest ein Geheimnis; null wenn nicht vorhanden oder nicht lesbar.</summary>
     public static string? Get(string name)
     {
-        if (!CredRead(Prefix + name, CRED_TYPE_GENERIC, 0, out var handle))
-            return null;
         try
         {
-            var cred = Marshal.PtrToStructure<CREDENTIAL>(handle);
-            if (cred.CredentialBlob == IntPtr.Zero || cred.CredentialBlobSize == 0)
-                return string.Empty;
-            var bytes = new byte[cred.CredentialBlobSize];
-            Marshal.Copy(cred.CredentialBlob, bytes, 0, (int)cred.CredentialBlobSize);
-            return Encoding.Unicode.GetString(bytes);
+            var path = PathFor(name);
+            if (!System.IO.File.Exists(path)) return null;
+            var enc = System.IO.File.ReadAllBytes(path);
+            if (enc.Length == 0) return null;
+            var dec = ProtectedData.Unprotect(enc, Entropy, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(dec);
         }
-        finally { CredFree(handle); }
+        catch
+        {
+            return null;
+        }
     }
 
-    /// <summary>Speichert ein Geheimnis sicher (an den Windows-Nutzer gebunden).</summary>
+    /// <summary>Speichert ein Geheimnis DPAPI-verschluesselt (an den Nutzer gebunden).</summary>
     public static void Set(string name, string value)
     {
-        var blob = Encoding.Unicode.GetBytes(value ?? string.Empty);
-        var blobPtr = Marshal.AllocHGlobal(Math.Max(blob.Length, 1));
         try
         {
-            if (blob.Length > 0)
-                Marshal.Copy(blob, 0, blobPtr, blob.Length);
-
-            var cred = new CREDENTIAL
-            {
-                Type               = CRED_TYPE_GENERIC,
-                TargetName         = Prefix + name,
-                CredentialBlob     = blobPtr,
-                CredentialBlobSize = (uint)blob.Length,
-                Persist            = CRED_PERSIST_LOCAL_MACHINE,
-                UserName           = Environment.UserName
-            };
-            if (!CredWrite(ref cred, 0))
-                throw new InvalidOperationException(
-                    $"CredWrite fehlgeschlagen (Win32-Fehler {Marshal.GetLastWin32Error()})");
+            var plain = Encoding.UTF8.GetBytes(value ?? string.Empty);
+            var enc   = ProtectedData.Protect(plain, Entropy, DataProtectionScope.CurrentUser);
+            System.IO.File.WriteAllBytes(PathFor(name), enc);
         }
-        finally { Marshal.FreeHGlobal(blobPtr); }
+        catch
+        {
+            // Persistierung fehlgeschlagen — Key gilt dann nur fuer die laufende Sitzung.
+        }
     }
 
-    /// <summary>Loescht ein Geheimnis (ignoriert, wenn nicht vorhanden).</summary>
-    public static void Delete(string name) => CredDelete(Prefix + name, CRED_TYPE_GENERIC, 0);
-
-    // ── P/Invoke (advapi32) ───────────────────────────────────────────────────
-    private const uint CRED_TYPE_GENERIC          = 1;
-    private const uint CRED_PERSIST_LOCAL_MACHINE = 2;
-
-    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "CredReadW")]
-    private static extern bool CredRead(string target, uint type, uint flags, out IntPtr credential);
-
-    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "CredWriteW")]
-    private static extern bool CredWrite(ref CREDENTIAL credential, uint flags);
-
-    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "CredDeleteW")]
-    private static extern bool CredDelete(string target, uint type, uint flags);
-
-    [DllImport("advapi32.dll")]
-    private static extern void CredFree(IntPtr buffer);
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct CREDENTIAL
+    /// <summary>Loescht ein gespeichertes Geheimnis (ignoriert, wenn nicht vorhanden).</summary>
+    public static void Delete(string name)
     {
-        public uint    Flags;
-        public uint    Type;
-        public string  TargetName;
-        public string? Comment;
-        public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
-        public uint    CredentialBlobSize;
-        public IntPtr  CredentialBlob;
-        public uint    Persist;
-        public uint    AttributeCount;
-        public IntPtr  Attributes;
-        public string? TargetAlias;
-        public string  UserName;
+        try
+        {
+            var path = PathFor(name);
+            if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+        }
+        catch
+        {
+        }
     }
 }
