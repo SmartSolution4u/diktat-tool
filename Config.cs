@@ -46,8 +46,8 @@ public class Config
     public static List<DictationMode> DefaultModes() => new()
     {
         new() { Name = "Roh",        Prompt = "",                                                                                                              Enabled = true },
-        new() { Name = "Förmlich",   Prompt = "Formuliere diesen Text professionell und förmlich für eine geschäftliche E-Mail. Antworte NUR mit dem fertigen Text.",       Enabled = true },
-        new() { Name = "Locker",     Prompt = "Formuliere diesen Text freundlich und locker, wie eine kurze Nachricht an einen Kollegen. Antworte NUR mit dem fertigen Text.", Enabled = true },
+        new() { Name = "Förmlich",   Prompt = "Formuliere den folgenden Text in professionelles, höfliches Business-Deutsch um. Gib AUSSCHLIESSLICH den umformulierten Fließtext zurück – OHNE Anrede (kein 'Sehr geehrte...'), OHNE Grußformel (kein 'Mit freundlichen Grüßen') und OHNE Signatur oder Platzhalter wie [Ihr Name] oder [Ihre Position]. Korrigiere Versprecher und Füllwörter.", Enabled = true },
+        new() { Name = "Locker",     Prompt = "Formuliere den folgenden Text freundlich und locker um, wie eine kurze Nachricht an einen Kollegen. Gib NUR den Fließtext zurück – OHNE Anrede, OHNE Grußformel und OHNE Signatur oder Platzhalter.", Enabled = true },
         new() { Name = "Korrigieren",Prompt = "Korrigiere nur Grammatik und Rechtschreibfehler, behalte den Stil bei. Antworte NUR mit dem korrigierten Text.",              Enabled = true },
         new() { Name = "Kürzer",     Prompt = "Fasse den Text prägnant zusammen, kürze auf das Wesentliche. Antworte NUR mit dem fertigen Text.",                           Enabled = true },
         new() { Name = "Aufzählung", Prompt = "Wandle den Text in eine übersichtliche Stichpunktliste um. Antworte NUR mit der fertigen Liste.",                            Enabled = true },
@@ -66,12 +66,16 @@ public class Config
             {
                 rawJson = System.IO.File.ReadAllText(FilePath);
                 cfg = JsonSerializer.Deserialize<Config>(rawJson) ?? new Config();
-                if (cfg.Modes == null || cfg.Modes.Count == 0)
-                    cfg.Modes = DefaultModes();
             }
             else cfg = new Config();
         }
         catch { cfg = new Config(); }
+
+        // Modus-Definitionen kommen IMMER aus dem Code (Prompts sind nicht
+        // nutzer-editierbar). So greifen Prompt-Aenderungen sofort, ohne dass
+        // alte, in config.json eingefrorene Prompts haengen bleiben.
+        // Der aktive Modus (Nutzerwahl) wird separat in ActiveMode gehalten.
+        cfg.Modes = DefaultModes();
 
         // Keys aus dem Windows Credential Manager laden
         cfg.GroqApiKey    = SecretStore.Get("GROQ_API_KEY")   ?? "";
