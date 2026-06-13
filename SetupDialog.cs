@@ -17,10 +17,16 @@ public class SetupDialog : Form
     private ComboBox  _model     = null!;
     private ComboBox  _hotkey    = null!;
 
+    private ListBox   _modeList   = null!;
+    private TextBox   _modeName   = null!;
+    private TextBox   _modePrompt = null!;
+    private List<DictationMode> _editModes = new();
+    private int _currentModeIndex = -1;
+
     public SetupDialog()
     {
         Text            = "Diktat-Tool — Einrichtung";
-        Size            = new Size(520, 560);
+        Size            = new Size(540, 640);
         StartPosition   = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox     = false;
@@ -41,6 +47,7 @@ public class SetupDialog : Form
 
         tabs.TabPages.Add(BuildApiTab());
         tabs.TabPages.Add(BuildModelTab());
+        tabs.TabPages.Add(BuildModesTab());
         tabs.TabPages.Add(BuildHotkeyTab());
 
         // Save button outside tabs
@@ -91,6 +98,12 @@ public class SetupDialog : Form
 
             if (_hotkey.Items.Contains(cfg.Hotkey))
                 _hotkey.SelectedItem = cfg.Hotkey;
+
+            // Modi als bearbeitbare Kopie in den Editor laden
+            _editModes = cfg.Modes
+                .Select(m => new DictationMode { Name = m.Name, Prompt = m.Prompt, Enabled = m.Enabled })
+                .ToList();
+            RefreshModeList(0);
         }
         catch { }
     }
@@ -212,14 +225,12 @@ public class SetupDialog : Form
         H1(page, "Modi wechseln", ref y);
         var hint2 = new Label
         {
-            Text      = "Den aktiven Modus wählst du über das Tray-Icon (Rechtsklick).\n\n" +
-                        "Verfügbare Modi:\n" +
-                        "  • Roh         — Text direkt einfügen\n" +
-                        "  • Förmlich    — Professionelle Geschäftssprache\n" +
-                        "  • Locker      — Freundlich, wie an Kollegen\n" +
-                        "  • Korrigieren — Nur Grammatik/Rechtschreibung\n" +
-                        "  • Kürzer      — Auf das Wesentliche kürzen\n" +
-                        "  • Aufzählung  — Als Stichpunktliste",
+            Text      = "Den aktiven Modus wählst du jederzeit über das Tray-Icon\n" +
+                        "(Rechtsklick auf das Symbol unten rechts).\n\n" +
+                        "Die Modi und ihre Prompts kannst du im Tab „Modi" anpassen –\n" +
+                        "eigene Modi anlegen, umbenennen oder löschen.\n\n" +
+                        "Tipp: Ein Modus mit leerem Prompt fügt den Text direkt ein\n" +
+                        "(keine KI), genau wie der Modus „Roh".",
             Location  = new Point(20, y),
             Size      = new Size(460, 160),
             ForeColor = MUTED,
@@ -229,6 +240,146 @@ public class SetupDialog : Form
         page.Controls.Add(hint2);
 
         return page;
+    }
+
+    private TabPage BuildModesTab()
+    {
+        var page = MakePage("Modi");
+        int y = 15;
+
+        H1(page, "Modi & Prompts bearbeiten", ref y);
+        Hint(page, "Modus anklicken, dann Name/Prompt unten anpassen.", ref y);
+        Hint(page, "Leerer Prompt = keine KI (Text wird direkt eingefügt, wie 'Roh').", ref y);
+
+        _modeList = new ListBox
+        {
+            Location    = new Point(20, y),
+            Size        = new Size(230, 120),
+            BackColor   = INPUT,
+            ForeColor   = FG,
+            BorderStyle = BorderStyle.FixedSingle,
+            Font        = new Font("Segoe UI", 9.5f)
+        };
+        _modeList.SelectedIndexChanged += OnModeSelected;
+        page.Controls.Add(_modeList);
+
+        var btnNew = MakeSmallButton("Neuer Modus", new Point(265, y));
+        btnNew.Click += OnModeNew;
+        page.Controls.Add(btnNew);
+
+        var btnDel = MakeSmallButton("Löschen", new Point(265, y + 34));
+        btnDel.Click += OnModeDelete;
+        page.Controls.Add(btnDel);
+
+        var btnReset = MakeSmallButton("Auf Standard", new Point(265, y + 68));
+        btnReset.Click += OnModesReset;
+        page.Controls.Add(btnReset);
+
+        y += 132;
+
+        page.Controls.Add(new Label
+        {
+            Text = "Name", Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = FG,
+            AutoSize = true, Location = new Point(20, y), BackColor = BG
+        });
+        y += 22;
+        _modeName = new TextBox
+        {
+            Location = new Point(20, y), Width = 490, BackColor = INPUT, ForeColor = FG,
+            Font = new Font("Segoe UI", 9.5f), BorderStyle = BorderStyle.FixedSingle
+        };
+        page.Controls.Add(_modeName);
+        y += 32;
+
+        page.Controls.Add(new Label
+        {
+            Text = "Prompt (Anweisung an die KI)", Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+            ForeColor = FG, AutoSize = true, Location = new Point(20, y), BackColor = BG
+        });
+        y += 22;
+        _modePrompt = new TextBox
+        {
+            Location = new Point(20, y), Size = new Size(490, 150), BackColor = INPUT, ForeColor = FG,
+            Font = new Font("Segoe UI", 9.5f), BorderStyle = BorderStyle.FixedSingle,
+            Multiline = true, ScrollBars = ScrollBars.Vertical, AcceptsReturn = true
+        };
+        page.Controls.Add(_modePrompt);
+
+        return page;
+    }
+
+    private Button MakeSmallButton(string text, Point loc) => new Button
+    {
+        Text      = text,
+        Location  = loc,
+        Size      = new Size(120, 28),
+        BackColor = INPUT,
+        ForeColor = FG,
+        FlatStyle = FlatStyle.Flat,
+        Font      = new Font("Segoe UI", 9f),
+        Cursor    = Cursors.Hand
+    };
+
+    private void OnModeSelected(object? sender, EventArgs e)
+    {
+        SaveCurrentModeFromFields();
+        _currentModeIndex = _modeList.SelectedIndex;
+        if (_currentModeIndex >= 0 && _currentModeIndex < _editModes.Count)
+        {
+            _modeName.Text   = _editModes[_currentModeIndex].Name;
+            _modePrompt.Text = _editModes[_currentModeIndex].Prompt;
+        }
+    }
+
+    private void SaveCurrentModeFromFields()
+    {
+        if (_currentModeIndex >= 0 && _currentModeIndex < _editModes.Count)
+        {
+            _editModes[_currentModeIndex].Name   = _modeName.Text.Trim();
+            _editModes[_currentModeIndex].Prompt = _modePrompt.Text.Trim();
+        }
+    }
+
+    private void RefreshModeList(int select)
+    {
+        _modeList.SelectedIndexChanged -= OnModeSelected;
+        _modeList.Items.Clear();
+        foreach (var m in _editModes) _modeList.Items.Add(m.Name);
+        _currentModeIndex = -1;
+        _modeList.SelectedIndexChanged += OnModeSelected;
+        if (select >= 0 && select < _editModes.Count)
+            _modeList.SelectedIndex = select;
+    }
+
+    private void OnModeNew(object? sender, EventArgs e)
+    {
+        SaveCurrentModeFromFields();
+        _editModes.Add(new DictationMode { Name = "Neuer Modus", Prompt = "", Enabled = true });
+        RefreshModeList(_editModes.Count - 1);
+    }
+
+    private void OnModeDelete(object? sender, EventArgs e)
+    {
+        SaveCurrentModeFromFields();
+        int idx = _modeList.SelectedIndex;
+        if (idx < 0) return;
+        if (_editModes.Count <= 1)
+        {
+            MessageBox.Show("Mindestens ein Modus muss bestehen bleiben.", "Hinweis",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        _editModes.RemoveAt(idx);
+        RefreshModeList(Math.Min(idx, _editModes.Count - 1));
+    }
+
+    private void OnModesReset(object? sender, EventArgs e)
+    {
+        if (MessageBox.Show("Alle Modi auf die Standard-Vorgaben zurücksetzen?",
+            "Zurücksetzen", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
+        _editModes = Config.DefaultModes();
+        RefreshModeList(0);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -342,11 +493,22 @@ public class SetupDialog : Form
             return;
         }
 
+        // Aktuelle Modus-Bearbeitung sichern und Modi uebernehmen
+        SaveCurrentModeFromFields();
+        var cleaned = _editModes.Where(m => !string.IsNullOrWhiteSpace(m.Name)).ToList();
+
         var cfg = Config.Load();
         cfg.GroqApiKey    = groq;
         cfg.OpenRouterKey = _orKey.Text.Trim();
         cfg.Model         = ModelId();
         cfg.Hotkey        = _hotkey.SelectedItem?.ToString() ?? "F9";
+        if (cleaned.Count > 0)
+        {
+            cfg.Modes = cleaned;
+            // Aktiven Modus auf gueltigen Wert halten, falls umbenannt/geloescht
+            if (!cleaned.Any(m => m.Name == cfg.ActiveMode))
+                cfg.ActiveMode = cleaned[0].Name;
+        }
         cfg.Save();
 
         DialogResult = DialogResult.OK;

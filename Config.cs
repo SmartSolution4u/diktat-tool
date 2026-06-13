@@ -71,11 +71,11 @@ public class Config
         }
         catch { cfg = new Config(); }
 
-        // Modus-Definitionen kommen IMMER aus dem Code (Prompts sind nicht
-        // nutzer-editierbar). So greifen Prompt-Aenderungen sofort, ohne dass
-        // alte, in config.json eingefrorene Prompts haengen bleiben.
-        // Der aktive Modus (Nutzerwahl) wird separat in ActiveMode gehalten.
-        cfg.Modes = DefaultModes();
+        // Modi aus der config.json uebernehmen; nur wenn keine vorhanden sind,
+        // mit den Standard-Modi befuellen. So bleiben eigene Anpassungen des
+        // Nutzers (Prompts, eigene Modi) erhalten.
+        if (cfg.Modes == null || cfg.Modes.Count == 0)
+            cfg.Modes = DefaultModes();
 
         // Keys aus dem Windows Credential Manager laden
         cfg.GroqApiKey    = SecretStore.Get("GROQ_API_KEY")   ?? "";
